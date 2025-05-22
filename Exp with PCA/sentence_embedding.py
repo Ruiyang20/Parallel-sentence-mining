@@ -3,7 +3,7 @@ import numpy as np
 from transformers import AutoModel, AutoTokenizer
 import torch
 from tqdm import tqdm
-#from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -43,11 +43,11 @@ def to_xlmr_sentence_embeddings(df, model_name_def):
 
 
 
-# def to_labse_sentence_embeddings(data,output_path):
+def to_labse_sentence_embeddings(data):
   model = SentenceTransformer('sentence-transformers/LaBSE')
   hsb_embeddings = model.encode(data['hsb'].tolist(), normalize_embeddings=True, show_progress_bar=True)
   de_embeddings = model.encode(data['de'].tolist(), normalize_embeddings=True, show_progress_bar=True)
   similarities = np.sum(hsb_embeddings * de_embeddings, axis=1)
-  data['similarity'] = similarities
-  data.to_csv(output_path, sep='\t', index=False)
+  return hsb_embeddings, de_embeddings, similarities
+
 
