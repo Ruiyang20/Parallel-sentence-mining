@@ -29,12 +29,11 @@ def build_features(hsb_vecs, de_vecs, sim, fit_pca=True, pca_hsb=None, pca_de=No
         pca_hsb = PCA(n_components=n_components).fit(hsb_vecs)
         pca_de = PCA(n_components=n_components).fit(de_vecs)
         pca_diff = PCA(n_components=n_components).fit(diff)
-    # PCA 降维
+    # PCA 
     hsb_pca = pca_hsb.transform(hsb_vecs)
     de_pca = pca_de.transform(de_vecs)
     diff_pca = pca_diff.transform(diff)
-    # 拼接所有特征：cs + de + diff + prod + l2 + similarity
-    sim_col = sim.diagonal().reshape(-1, 1)  # 提取对角线元素作为相似度特征
+    sim_col = sim.diagonal().reshape(-1, 1) 
     features = np.hstack([hsb_pca, de_pca,diff_pca])
     return features,pca_hsb, pca_de,pca_diff
 
@@ -42,8 +41,8 @@ def train_eval(X_train, y_train, X_val, y_val, model, name):
     model.fit(X_train, y_train)
     y_pred = model.predict(X_val)
     if hasattr(model, "predict_proba"):
-        y_score = model.predict_proba(X_val)[:, 1]  # 使用正类概率
-    elif hasattr(model, "decision_function"):  # SVM等
+        y_score = model.predict_proba(X_val)[:, 1] 
+    elif hasattr(model, "decision_function"): 
         y_score = model.decision_function(X_val)
     else:
         y_score = y_pred  # fallback
@@ -168,7 +167,7 @@ def test(fitted_models, X_test, y_test, best_thresholds):
     final_metrics = []
     for name, model in fitted_models:
         if model is None:
-            continue  # 跳过基线模型
+            continue  
         threshold = best_thresholds[name]
         metrics = final_test(model, X_test, y_test, threshold, name)
         final_metrics.append(metrics)
@@ -180,7 +179,7 @@ def test(fitted_models, X_test, y_test, best_thresholds):
     return final_df
 
 def main():
-    model = "glot500"  # 或 "labse" "glot500"
+    model = "glot500"  # or "labse" "glot500"
     base_path = f"./CBIE/cs-de"
     path= f"./CBIE/hsb-de"
     _, hsb_all = utils.load_vec_file(f"{base_path}/{model}.cs-de.train.cs.vec")

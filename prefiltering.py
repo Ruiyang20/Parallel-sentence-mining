@@ -6,16 +6,16 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import langid
 
 LEGAL_TERMS = [
-    "artikel",            # 法律条款
-    "absatz",             # 段落
-    "paragraph",          # 段落 §
-    "anlage",             # 附件
-    "anhang",             # 附录
-    "nummer", "nr.",      # 编号 Nr. 1234/2010
-    "kapitel",            # 章节
-    "abl.",               # ABl. = Amtsblatt = 官方公报
-    "amtsblatt",          # 全称
-    "eur-lex",            # 欧盟法库
+    "artikel",            
+    "absatz",             
+    "paragraph",          
+    "anlage",             
+    "anhang",             
+    "nummer", "nr.",      
+    "kapitel",            
+    "abl.",               
+    "amtsblatt",          
+    "eur-lex",            
 ]
 
 smooth = SmoothingFunction().method1
@@ -32,10 +32,10 @@ remove_regulation = False
 remove_template_duplicates = True
 strict_legal_filter = False
 
-langid.set_languages(['sl', 'de'])
+langid.set_languages(['cs', 'de'])
 
 
-# 匹配非拉丁字符（如阿拉伯、波斯、汉字、韩文等）
+
 non_latin_pattern = re.compile(r"[؀-ۿЀ-ӿ一-鿿가-힯]+")
 
 
@@ -93,7 +93,6 @@ def normalize_template(text):
 def has_dot_line(text):
     if not isinstance(text, str):
         return False
-    # 匹配 3 组以上的点号或中点（英文句点或 Unicode）
     return bool(re.search(r"(\.\s?){3,}|(·\s?){3,}|(–\s?){3,}", text))
 
 
@@ -107,76 +106,68 @@ def contains_legal_keywords(text):
 def filter_corpus(df):
     print(f"🔍 原始句对数: {len(df)}")
 
-    df["sl"] = df["sl"].astype(str).str.strip()
+    df["cs"] = df["cs"].astype(str).str.strip()
     df["de"] = df["de"].astype(str).str.strip()
 
-    # 1.  语言内容过滤
-    df = df[df["sl"].apply(looks_language_like) & df["de"].apply(looks_language_like)]
 
-    print(f"✅ 语言内容过滤后: {len(df)}")
-    # 2. 网址过滤
-    url_mask = df["sl"].apply(contains_url) | df["de"].apply(contains_url)
-    print(f"❌ 删除包含 URL 的句对: {url_mask.sum()}")
+    df = df[df["cs"].apply(looks_language_like) & df["de"].apply(looks_language_like)]
+
+
+    url_mask = df["cs"].apply(contains_url) | df["de"].apply(contains_url)
     df = df[~url_mask]
-    # 2. 最小词数过滤
-    df["sl_len"] = df["sl"].str.split().str.len()
+    df["cs_len"] = df["cs"].str.split().str.len()
     df["de_len"] = df["de"].str.split().str.len()
     df = df[
-        (df["sl_len"] >= min_words) & (df["sl_len"] <= max_words) &
+        (df["cs_len"] >= min_words) & (df["cs_len"] <= max_words) &
         (df["de_len"] >= min_words) & (df["de_len"] <= max_words)
     ]
 
-    print(f"✅ 词数过滤后: {len(df)}")
 
-    # 3. 长度比例过滤
-    df["len_ratio"] = df["sl_len"] / df["de_len"]
+    df["len_ratio"] = df["cs_len"] / df["de_len"]
     df = df[(df["len_ratio"] >= min_len_ratio) & (df["len_ratio"] <= max_len_ratio)]
-    print(f"✅ 长度比例过滤后: {len(df)}")
 
-    # 4. 精确重复句对过滤
+
+   
     df = df.drop_duplicates()
-    print(f"✅ 去重后: {len(df)}")
 
-    # 5. 占位符样式句子过滤（点点点）
-    mask = df["sl"].apply(has_dot_line) | df["de"].apply(has_dot_line)
-    print(f"❌ 删除占位符样式句子数: {mask.sum()}")
+
+    mask = df["cs"].apply(has_dot_line) | df["de"].apply(has_dot_line)
     df = df[~mask]
 
     before = len(df)
     df = df[
-        df["sl"].apply(lambda x: is_lang(x, "sl")) &
+        df["cs"].apply(lambda x: is_lang(x, "cs")) &
         df["de"].apply(lambda x: is_lang(x, "de"))
     ]
-    print(f"❌ 其他语言 {before - len(df)}")
 
-    # 6. 模板重复句过滤（结构雷同）
+
     if remove_template_duplicates:
-        df["sl_template"] = df["sl"].apply(normalize_template)
+        df["cs_template"] = df["cs"].apply(normalize_template)
         df["de_template"] = df["de"].apply(normalize_template)
-        template_counts = df.groupby(["sl_template", "de_template"]).size()
+        template_counts = df.groupby(["cs_template", "de_template"]).size()
         duplicated = template_counts[template_counts > 1].index
         before = len(df)
-        df = df[~df.set_index(["sl_template", "de_template"]).index.isin(duplicated)]
-        print(f"❌ 删除模板重复句对: {before - len(df)}")
+        df = df[~df.set_index(["cs_template", "de_template"]).index.isin(duplicated)]
 
-    helper_cols = ["sl_template", "de_template", "sl_len", "de_len", "len_ratio"]
+
+    helper_cols = ["cs_template", "de_template", "cs_len", "de_len", "len_ratio"]
     df = df.drop(columns=[c for c in helper_cols if c in df.columns])
 
-    # 检测 cs 和 de 是否包含外语字符（如波斯语、阿拉伯语）
-    mask_foreign = df["sl"].apply(contains_foreign_script) | df["de"].apply(contains_foreign_script)
 
-    # 输出这些包含嵌入外语的句子（可手动检查）
+    mask_foreign = df["cs"].apply(contains_foreign_script) | df["de"].apply(contains_foreign_script)
+
+
     df_foreign = df[mask_foreign]
-    df_foreign.to_csv("de-sl-contains_foreign_script.tsv", sep="	", index=False)
-    print(f"❌ 嵌入其他语言: {len(df_foreign)}")
+    df_foreign.to_csv("de-cs-contains_foreign_script.tsv", sep="	", index=False)
+
     df = df[~mask_foreign]
     before = len(df)
-    df = df[~df["sl"].str.contains("�")]
-    print(f"❌ 含有无法识别符号: {before - len(df)}")
+    df = df[~df["cs"].str.contains("")]
+
     # 保存
     df.to_csv(output_file, sep="	", index=False)
 
-    print(f"✅ 最终保留句对数: {len(df)}")
+    print(f"Final sentence pairs: {len(df)}")
 
 
 def main():

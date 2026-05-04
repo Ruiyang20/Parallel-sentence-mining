@@ -71,10 +71,47 @@ def toggle_negation(text):
 
 def strengthen_modality_de(text):
     mapping = {
-        "können": "müssen",
-        "dürfen": "werden",
-        "sollen": "werden",
-        "mögen": "werden"
+    # können → müssen
+    "kann": "muss",
+    "können": "müssen",
+    "könnt": "müsst",
+    "konnte": "musste",
+    "konnten": "mussten",
+    "konntest": "musstest",
+    "konntet": "musstet",
+    "könnte": "müsste",
+    "könnten": "müssten",
+
+    # dürfen → werden
+    "darf": "wird",
+    "dürfen": "werden",
+    "dürft": "werdet",
+    "durfte": "wurde",
+    "durften": "wurden",
+    "durftest": "wurdest",
+    "durftet": "wurdet",
+    "dürfte": "würde",
+    "dürften": "würden",
+
+    # sollen → werden
+    "soll": "wird",
+    "sollen": "werden",
+    "sollt": "werdet",
+    "sollte": "würde",
+    "sollten": "würden",
+    "solltest": "würdest",
+    "solltet": "würdet",
+
+    # mögen → werden
+    "mag": "wird",
+    "mögen": "werden",
+    "mögt": "werdet",
+    "mochte": "wurde",
+    "mochten": "wurden",
+    "mochtest": "wurdest",
+    "mochtet": "wurdet",
+    "möchte": "würde",
+    "möchten": "würden"
     }
     doc = nlp(text)
     new_words = []
@@ -96,12 +133,15 @@ def replace_adjective_antonyms(text):
 
     for word in words:
         lower = word.lower()
-        if lower in antonyms_dict:
-            antonym = antonyms_dict[lower]
-            if word[0].isupper():
-                antonym = antonym.capitalize()
-            new_words.append(antonym)
-            replaced = True
+        for adj, antonym in antonyms_dict.items():
+            if lower.startswith(adj):
+                suffix = lower[len(adj):]
+                new_word = antonym + suffix
+                if word[0].isupper():
+                    new_word = new_word.capitalize()
+                new_words.append(new_word)
+                replaced = True
+                break
         else:
             new_words.append(word)
 
@@ -196,12 +236,12 @@ def replace_surface_tokens(input_file, sample_size=15000):
     transformations = {
         "entity": {
             "func": entity_replacement,
-            "file": "transformed_entity_sl.tsv",
+            "file": "transformed_entity_cs.tsv",
             "filter": filter_for_entity
         },
         "number": {
             "func": number_replacement,
-            "file": "transformed_number_sl.tsv",
+            "file": "transformed_number_cs.tsv",
             "filter": filter_for_number
         }
     }
@@ -247,76 +287,75 @@ def replace_surface_tokens(input_file, sample_size=15000):
         out_df = pd.DataFrame(augmented_rows)
         out_df.to_csv(output_file, sep="\t", index=False, header=True)
 
-def logical_relation(input_file, sample_size=25000):
-    ausality_modes = {
+def logical_relation(input_file, sample_size=10000):
+    df = pd.read_csv(input_file, sep="\t")
+    causality_modes = {
     "modality": {
         "filter": contains_modality,
         "func": strengthen_modality_de,
-        "file": "sl-transformed_causality_modality.tsv"
+        "file": "cs-transformed_causality_modality.tsv"
     },
     "negation": {
         "filter": can_negation,
         "func": toggle_negation,
-        "file": "sl-transformed_causality_negation.tsv"
+        "file": "cs-transformed_causality_negation.tsv"
 
     },
     "antonym": {
         "filter": contains_adjective_with_antonym,
         "func": replace_adjective_antonyms,
-        "file": "sl-transformed_causality_antonym.tsv"
+        "file": "cs-transformed_causality_antonym.tsv"
 
     }
 }
 
-for i, (mode, info) in enumerate(causality_modes.items()):
-    print(f"causality: {mode}")
-    func = info["func"]
-    filter_func = info["filter"]
-    output_file = info["file"]
-    max_samples = 10000
-    count = 0
-    causality_augmented_rows = []
-    df_shuffled = df.sample(frac=1, random_state=80+i).reset_index(drop=True)
+    for i, (mode, info) in enumerate(causality_modes.items()):
+        print(f"causality: {mode}")
+        func = info["func"]
+        filter_func = info["filter"]
+        output_file = info["file"]
+        count = 0
+        causality_augmented_rows = []
+        df_shuffled = df.sample(frac=1, random_state=80+i).reset_index(drop=True)
 
-    for _, row in df_shuffled.iterrows():
-        if count >= max_samples:
-            break
+        for _, row in df_shuffled.iterrows():
+            if count >= sample_size:
+                break
 
-        src = row["sl"]
-        tgt = row["de"]
+            src = row["cs"]
+            tgt = row["de"]
 
-        if not filter_func(tgt):
-            continue
+            if not filter_func(tgt):
+                continue
 
-        new_tgt = func(tgt)
+            new_tgt = func(tgt)
 
-        if new_tgt != tgt:
-            causality_augmented_rows.append({
-                "sl": src,
-                "de": new_tgt,
-                "label": 0,
-                "transformation": mode
-            })
-            count += 1
+            if new_tgt != tgt:
+                causality_augmented_rows.append({
+                    "cs": src,
+                    "de": new_tgt,
+                    "label": 0,
+                    "transformation": mode
+                })
+                count += 1
     
-    actual = len(causality_augmented_rows)
-    if actual < max_samples:
-        print(f"{mode} has not enough samples {actual}/{max_samples}")
+        actual = len(causality_augmented_rows)
+        if actual < sample_size:
+            print(f"{mode} has not enough samples {actual}/{sample_size}")
 
-    out_df = pd.DataFrame(causality_augmented_rows)
-    out_df.to_csv(output_file, sep="\t", index=False, header=True)
+        out_df = pd.DataFrame(causality_augmented_rows)
+        out_df.to_csv(output_file, sep="\t", index=False, header=True)
 
-    print(f"✅ 模式 {mode} 完成，共生成 {count} 条句子")
  
 
 
 
 if __name__ == "__main__":
     replace_surface_tokens(
-        input_file="de-sl-filtered.tsv",
-        sample_size=25000,
+        input_file="de-cs-filtered.tsv",
+        sample_size=15000,
     )
     logical_relation(
-        input_file="de-sl-filtered.tsv",
-        sample_size=25000,
+        input_file="de-cs-filtered.tsv",
+        sample_size=10000,
     )
